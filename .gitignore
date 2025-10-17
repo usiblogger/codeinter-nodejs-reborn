@@ -1,6 +1,7 @@
 # Hidden files and folders (starting with .)
 .*
 !.gitignore
+!.cursorrules
 
 # Database files
 *.db

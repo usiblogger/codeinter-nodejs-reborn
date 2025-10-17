@@ -1,0 +1,157 @@
+# Project: CodeIgniter to Remix Migration (BaseModel Pattern)
+
+## Core Principles
+- Use BaseModel for all database operations (auto-generates SQL)
+- One route file per resource using optional parameters: `resource.($action).($id).tsx`
+- Optional type system: support both `any` and typed approaches
+- Keep it simple like CodeIgniter
+
+## Database Layer Rules
+
+### Always use BaseModel
+```typescript
+// ✅ DO: Use BaseModel for CRUD
+const userBase = new BaseModel('users');
+userBase.getAll();
+userBase.getById(id);
+userBase.create({ name, email });
+userBase.update(id, { name, email });
+userBase.delete(id);
+
+// ❌ DON'T: Write raw SQL
+db.prepare("INSERT INTO users...").run();
+```
+
+### No separate Model files required
+```typescript
+// ✅ DO: Create BaseModel directly in routes
+const userBase = new BaseModel('users');
+
+// ❌ DON'T: Create separate Model classes unless needed for types
+```
+
+## Routing Rules
+
+### Use optional parameter routing
+```typescript
+// ✅ DO: One file for all CRUD
+// routes/resource.($action).($id).tsx
+export async function loader({ params }) {
+  if (params.action === 'edit' && params.id) {
+    // Edit mode
+  }
+  // List mode
+}
+
+// ❌ DON'T: Split into multiple files
+// routes/resource._index.tsx
+// routes/resource.$id.tsx
+// routes/resource.edit.$id.tsx
+```
+
+## Type System Rules
+
+### Support both typed and untyped approaches
+```typescript
+// ✅ DO: Allow any for simplicity
+const userBase = new BaseModel('users');
+
+// ✅ ALSO OK: Use types when helpful
+const userBase = new BaseModel<User>('users');
+```
+
+## Code Style
+
+### Keep loader/action simple
+```typescript
+// ✅ DO: Simple and direct
+export async function action({ request }) {
+  const formData = await request.formData();
+  const intent = formData.get("intent");
+  
+  if (intent === "create") {
+    userBase.create({ 
+      name: formData.get("name"),
+      email: formData.get("email")
+    });
+  }
+  return redirect("/users");
+}
+
+// ❌ DON'T: Over-engineer
+```
+
+### Prefer any over complex types
+```typescript
+// ✅ DO: Use any for parameters
+create(data: any): T | undefined
+
+// ❌ DON'T: Over-specify unless necessary
+create(data: { name: string; email: string; age?: number }): Promise<User>
+```
+
+## File Structure
+
+```
+app/
+├── models/
+│   ├── BaseModel.ts          # Core (never modify)
+│   └── [Resource].model.ts   # Optional, only for type demos
+├── routes/
+│   └── [resource].($action).($id).tsx  # One file per resource
+└── views/
+    └── [resource]/
+        ├── IndexView.tsx
+        └── EditView.tsx
+```
+
+## Comments
+- Keep comments in English
+- Explain "why" not "what"
+- Mark innovations with ✅
+
+## New Table Pattern
+
+When creating a new table:
+1. Add table to `database.ts`
+2. Create single route file: `resource.($action).($id).tsx`
+3. Use `new BaseModel('resource')` directly in route
+4. Optional: Create `Resource.model.ts` only if types needed
+
+## Example: Add new Products table
+
+```typescript
+// 1. app/config/database.ts
+db.exec(`
+  CREATE TABLE IF NOT EXISTS products (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL,
+    price REAL NOT NULL
+  )
+`);
+
+// 2. app/routes/products.($action).($id).tsx
+const productBase = new BaseModel('products');
+
+export async function loader({ params }) {
+  if (params.action === 'edit' && params.id) {
+    return json({ product: productBase.getById(params.id) });
+  }
+  return json({ products: productBase.getAll() });
+}
+
+export async function action({ request }) {
+  const formData = await request.formData();
+  
+  if (intent === "create") {
+    productBase.create({
+      name: formData.get("name"),
+      price: formData.get("price")
+    });
+  }
+  return redirect("/products");
+}
+```
+
+That's it! No Model file needed unless you want types.
+
